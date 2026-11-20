@@ -2,6 +2,7 @@ from station.bench.confirmation import SourceConfirmation
 from station.bench.events import BenchEvent, BenchEventAdapter
 from station.bench.exposure import ExposureLedger
 from station.bench.fixture import Fixture
+from station.bench.pages import PageLedger
 from station.bench.recording import ReplyBuffer
 from station.setup.database import InjectedFailure
 
@@ -25,10 +26,18 @@ class OfflineBench:
         self.fixture = Fixture(shifts, self.exposures)
         self.replies = ReplyBuffer(self.exposures)
         self.adapter = BenchEventAdapter(self.fixture, self.exposures, self.replies)
+        self.pages = PageLedger(
+            self.exposures.device, self.replies, self.exposures, self.adapter.release_edges,
+            checkpoint=checkpoint,
+        )
         self.confirmation = SourceConfirmation(
             self.replies, self.exposures, self.adapter.release_edges, checkpoint=checkpoint
         )
         self._closed = False
+
+    @property
+    def device(self):
+        return self.exposures.device
 
     def emit(self, kind, *, shift_id=None, specimen_id=None, exposure_id=None, head=None):
         event = BenchEvent(
@@ -44,13 +53,35 @@ class OfflineBench:
         self._require_online()
         return self.adapter.request_measurement(head)
 
-    def record(self, exposure_id, raw_code):
+    def open_page(self, slot):
         self._require_online()
-        return self.replies.record(exposure_id, raw_code)
+        return self.pages.open(slot)
+
+    def record(self, exposure_id, raw_code, page=None):
+        self._require_online()
+        if page is None:
+            return self.replies.record(exposure_id, raw_code)
+        return self.pages.record(exposure_id, raw_code, page)
+
+    def seal_page(self, page):
+        self._require_online()
+        return self.pages.seal(page)
+
+    def deliver_seal(self, page):
+        self._require_online()
+        return self.pages.deliver_seal(page)
 
     def deliver_reply(self, exposure_id):
         self._require_online()
         return self.adapter.deliver_reply(exposure_id)
+
+    def page_of(self, exposure_id):
+        self._require_online()
+        return self.pages.page_of(exposure_id)
+
+    def confirm_page(self, page):
+        self._require_online()
+        return self.pages.confirm_page(page)
 
     def exposure(self, exposure_id):
         self._require_online()

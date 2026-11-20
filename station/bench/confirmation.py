@@ -1,3 +1,19 @@
+from dataclasses import dataclass
+
+from station.bench.recording import PageKey, validate_exposure_tuple
+
+
+@dataclass(frozen=True, slots=True)
+class PageConfirmation:
+    page: PageKey
+    exposures: tuple[str, ...]
+
+    def __post_init__(self):
+        if not isinstance(self.page, PageKey):
+            raise ValueError('page confirmation requires a page key')
+        validate_exposure_tuple(self.exposures, 'page confirmation exposure')
+
+
 class SourceConfirmation:
     def __init__(self, replies, exposures, release_edges, *, checkpoint=None):
         self._replies = replies
@@ -8,6 +24,8 @@ class SourceConfirmation:
         self._attempts: dict[str, int] = {}
 
     def confirm(self, exposure_id):
+        if self._replies.page_of(exposure_id) is not None:
+            raise ValueError('page material cannot be single-exposure confirmed')
         already_confirmed = self.is_confirmed(exposure_id)
         if not already_confirmed:
             self._replies.get(exposure_id)

@@ -26,6 +26,10 @@ class ExposureLedger:
         self._requested: dict[tuple[str, str], set[str]] = {}
         self._completed: dict[tuple[str, str], set[str]] = {}
 
+    @property
+    def device(self):
+        return self._namespace
+
     def request(self, shift_id, specimen_id, head):
         if head not in HEADS:
             raise ValueError(f'unknown head {head!r}')
